@@ -6,10 +6,26 @@ using UnityEngine.SceneManagement;
 
 namespace Unity.GoQL
 {
-    public class GoQLExecutor
+    public partial class GoQLExecutor
     {
-        Stack<object> stack;
-        List<GameObject> selection;
+
+        readonly Stack<object> stack = new Stack<object>();
+        readonly DoubleBuffer<GameObject> selection = new DoubleBuffer<GameObject>();
+        readonly List<object> instructions = new List<object>();
+        
+        bool refresh = true;
+        string code;
+        
+        public string Code {
+            get => code;
+            set {
+                if(value != code) 
+                    refresh = true;
+                code = value;
+            }
+        }
+
+        public ParseResult parseResult;
 
         public string Error
         {
@@ -18,58 +34,86 @@ namespace Unity.GoQL
         } = string.Empty;
 
         static Dictionary<string, Type> typeCache;
+        static object typeCacheLock = new object();
+        static Dictionary<GameObject, string> nameCache = new Dictionary<GameObject, string>();
+
+        static string GetName(GameObject gameObject)
+        {
+            if (!nameCache.TryGetValue(gameObject, out string name))
+                name = nameCache[gameObject] = gameObject.name;
+            return name;
+        }
 
         static Type FindType(string name)
         {
-            if (typeCache == null)
+            lock (typeCacheLock)
             {
-                typeCache = new Dictionary<string, Type>();
-                var assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
-                foreach (var i in assemblies)
+                if (typeCache == null)
                 {
-                    foreach (var j in i.GetTypes())
+                    typeCache = new Dictionary<string, Type>();
+                    var assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+                    foreach (var i in assemblies)
                     {
-                        if (j.IsSubclassOf(typeof(Component)))
+                        foreach (var j in i.GetTypes())
                         {
-                            if (typeCache.ContainsKey(j.Name))
+                            if (j.IsSubclassOf(typeof(Component)))
                             {
-                                typeCache.Add($"{j.Namespace}.{j.Name}", j);
-                                var existingType = typeCache[j.Name];
-                                typeCache.Add($"{existingType.Namespace}.{existingType.Name}", j);
-                            }
-                            else
-                            {
-                                typeCache.Add(j.Name, j);
+                                if (typeCache.ContainsKey(j.Name))
+                                {
+                                    typeCache.Add($"{j.Namespace}.{j.Name}", j);
+                                    var existingType = typeCache[j.Name];
+                                    typeCache.Add($"{existingType.Namespace}.{existingType.Name}", j);
+                                }
+                                else
+                                {
+                                    typeCache.Add(j.Name, j);
+                                }
                             }
                         }
                     }
                 }
+                if (typeCache.TryGetValue(name, out Type type))
+                    return type;
+                return null;
             }
-            if (typeCache.TryGetValue(name, out Type type))
-                return type;
-            return null;
         }
 
-        public GameObject[] Execute(List<object> instructions)
+        public GameObject[] Execute()
         {
-            stack = new Stack<object>();
+            if(!refresh) {
+                return selection.ToArray();
+            }
+            
+            instructions.Clear();
+            GoQL.Parser.Parse(code, instructions, out parseResult);
+            stack.Clear();
+            selection.Clear();
             Error = string.Empty;
-            if (selection != null) selection.Clear();
-            foreach (var i in instructions)
+            if (instructions.Count > 0)
             {
-                if (i is GoQLCode)
+                var firstCode = instructions[0];
+                if (firstCode is GoQLCode && ((GoQLCode)firstCode) == GoQLCode.EnterChildren)
                 {
-                    ExecuteCode((GoQLCode)i);
+                    CollectRootObjects();
                 }
                 else
                 {
-                    stack.Push(i);
+                    CollectAllObjects();
+                }
+                foreach (var i in instructions)
+                {
+                    if (i is GoQLCode)
+                    {
+                        ExecuteCode((GoQLCode)i);
+                    }
+                    else
+                    {
+                        stack.Push(i);
+                    }
                 }
             }
-
-            var results = selection == null ? new GameObject[0] : selection.ToArray();
-            selection = null;
-            return results;
+            refresh = false;
+            return selection.ToArray();
         }
 
         void ExecuteCode(GoQLCode i)
@@ -91,47 +135,75 @@ namespace Unity.GoQL
             }
         }
 
-        void CheckSelection()
+        void CollectAllObjects()
         {
-            if (selection == null)
+            //populate with all gameobjects ready for filtering.
+            for (var i = 0; i < SceneManager.sceneCount; i++)
             {
-                selection = new List<GameObject>();
-                for (var i = 0; i < SceneManager.sceneCount; i++)
+                var scene = SceneManager.GetSceneAt(i);
+                foreach (var j in scene.GetRootGameObjects())
                 {
-                    var scene = SceneManager.GetSceneAt(i);
-                    foreach (var j in scene.GetRootGameObjects())
-                    {
-                        AddToSelection(j, selection);
-                    }
+                    _CollectAllGameObjects(j);
                 }
             }
+            selection.Swap();
         }
 
-        void AddToSelection(GameObject gameObject, List<GameObject> gameObjects)
+        void _CollectAllGameObjects(GameObject gameObject)
         {
-            gameObjects.Add(gameObject);
+            selection.Add(gameObject);
             foreach (Transform transform in gameObject.transform)
             {
-                AddToSelection(transform.gameObject, gameObjects);
+                _CollectAllGameObjects(transform.gameObject);
             }
         }
 
         void FilterName()
         {
-            CheckSelection();
             var q = stack.Pop().ToString();
-            var results = DiscriminateByName(q, selection).ToArray();
-            selection.Clear();
-            selection.AddRange(results);
+            if (q.StartsWith("*") && q.EndsWith("*"))
+            {
+                q = q.Substring(1, q.Length - 2);
+                foreach (var i in selection)
+                {
+                    if (GetName(i).Contains(q))
+                        selection.Add(i);
+                }
+            }
+            else if (q.StartsWith("*"))
+            {
+                q = q.Substring(1);
+                foreach (var i in selection)
+                {
+                    if (GetName(i).EndsWith(q))
+                        selection.Add(i);
+                }
+            }
+            else if (q.EndsWith("*"))
+            {
+                q = q.Substring(0, q.Length - 1);
+                foreach (var i in selection)
+                {
+                    if (GetName(i).StartsWith(q))
+                        selection.Add(i);
+                }
+            }
+            else
+            {
+                foreach (var i in selection)
+                {
+                    if (GetName(i) == q)
+                        selection.Add(i);
+                }
+            }
+            selection.Swap();
         }
 
         void FilterIndex()
         {
-            CheckSelection();
             if (selection.Count > 0)
             {
                 var argCount = (int)stack.Pop();
-                var candidates = new List<GameObject>();
                 var indices = new int[selection.Count];
                 var lengths = new int[selection.Count];
                 for (var i = 0; i < selection.Count; i++)
@@ -149,7 +221,7 @@ namespace Unity.GoQL
                             var index = mod(((int)arg), lengths[i]);
                             if (index == indices[j])
                             {
-                                candidates.Add(selection[j]);
+                                selection.Add(selection[j]);
                             }
                         }
                     }
@@ -162,23 +234,20 @@ namespace Unity.GoQL
                             {
                                 if (mod(index, lengths[j]) == indices[j])
                                 {
-                                    candidates.Add(selection[j]);
+                                    selection.Add(selection[j]);
                                 }
                             }
                         }
                     }
                 }
-                selection.Clear();
-                candidates.Reverse();
-                selection.AddRange(candidates);
+                selection.Swap();
+                selection.Reverse();
             }
         }
 
         void FilterComponent()
         {
-            CheckSelection();
             var argCount = (int)stack.Pop();
-            var candidates = selection.ToList();
             for (var i = 0; i < argCount; i++)
             {
                 var arg = stack.Pop();
@@ -187,7 +256,14 @@ namespace Unity.GoQL
                     var type = FindType((string)arg);
                     if (type != null)
                     {
-                        candidates.RemoveAll(g => !g.TryGetComponent(type, out Component component));
+                        foreach (var g in selection)
+                        {
+                            if (g.TryGetComponent(type, out Component component))
+                            {
+                                selection.Add(g);
+                            }
+                        }
+                        selection.Swap();
                     }
                     else
                     {
@@ -195,54 +271,24 @@ namespace Unity.GoQL
                     }
                 }
             }
-            selection.Clear();
-            selection.AddRange(candidates);
+        }
+
+        void CollectRootObjects()
+        {
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+            {
+                selection.AddRange(SceneManager.GetSceneAt(i).GetRootGameObjects());
+            }
         }
 
         void EnterChildren()
         {
-            if (selection == null)
+            foreach (var i in selection)
             {
-                selection = new List<GameObject>();
-                for (var i = 0; i < SceneManager.sceneCount; i++)
-                {
-                    selection.AddRange(SceneManager.GetSceneAt(i).GetRootGameObjects());
-                }
+                for (var j = 0; j < i.transform.childCount; j++)
+                    selection.Add(i.transform.GetChild(j).gameObject);
             }
-            else
-            {
-                var children = new List<GameObject>();
-                foreach (var i in selection)
-                {
-                    for (var j = 0; j < i.transform.childCount; j++)
-                        children.Add(i.transform.GetChild(j).gameObject);
-                }
-                selection.Clear();
-                selection.AddRange(children);
-            }
-        }
-
-        IEnumerable<GameObject> DiscriminateByName(string q, List<GameObject> candidates)
-        {
-            if (q.StartsWith("*") && q.EndsWith("*"))
-            {
-                q = q.Substring(1, q.Length - 2);
-                return (from i in candidates where i.name.Contains(q) select i);
-            }
-            else if (q.StartsWith("*"))
-            {
-                q = q.Substring(1);
-                return (from i in candidates where i.name.EndsWith(q) select i);
-            }
-            else if (q.EndsWith("*"))
-            {
-                q = q.Substring(0, q.Length - 1);
-                return (from i in candidates where i.name.StartsWith(q) select i);
-            }
-            else
-            {
-                return (from i in candidates where i.name == q select i);
-            }
+            selection.Swap();
         }
 
         int mod(int a, int b) => a - b * Mathf.FloorToInt(1f * a / b);

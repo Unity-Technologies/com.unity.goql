@@ -8,7 +8,7 @@ namespace Unity.GoQL
     public class GoQLWindow : EditorWindow
     {
         string query = string.Empty;
-        GoQLExecutor goqlMachine;
+        GoQLExecutor goqlMachine = new GoQLExecutor();
         List<object> instructions;
         GameObject[] selection;
 
@@ -22,12 +22,9 @@ namespace Unity.GoQL
         // Update is called once per frame
         void Update()
         {
-            instructions = Parser.Parse(query);
-            if (goqlMachine == null)
-            {
-                goqlMachine = new GoQLExecutor();
-            }
-            selection = goqlMachine.Execute(instructions);
+            instructions = Parser.Parse(query, out ParseResult result);
+            goqlMachine.Code = query;
+            selection = goqlMachine.Execute();
             // if (goqlMachine.selection != null)
             //     Selection.objects = goqlMachine.selection.ToArray();
         }
@@ -42,16 +39,14 @@ namespace Unity.GoQL
             if (instructions != null)
                 foreach (var i in instructions)
                 {
-                    // GUILayout.Label(i.ToString());
+                    GUILayout.Label(i.ToString());
                 }
+            // foreach (var i in goqlMachine.messages)
+            // {
+            //     GUILayout.Label(i);
+            // }
             GUILayout.BeginVertical("box");
-            if (selection != null)
-            {
-                foreach (var i in selection)
-                    if (i != null) GUILayout.Label(i.name);
-                Selection.objects = selection;
-                selection = null;
-            }
+            Selection.objects = selection;
 
             GUILayout.EndVertical();
         }
