@@ -4,7 +4,7 @@ namespace Unity.GoQL
         EnterChildren,
         FilterName,
         FilterIndex,
-        FilterComponent
+        FilterByDiscriminators
     }
 
 }

@@ -6,15 +6,6 @@ using UnityEngine;
 namespace Unity.GoQL
 {
 
-    public enum ParseResult
-    {
-        UnexpectedEndOfInput,
-        Empty,
-        OK,
-        ClosingTokenMismatch,
-        InvalidNumberFormat
-    }
-
     public class Parser
     {
         public static void Parse(string code, List<object> instructions, out ParseResult parseResult)
@@ -22,9 +13,11 @@ namespace Unity.GoQL
             var tokenizer = new Tokenizer();
             var tokens = tokenizer.Tokenize(code);
             parseResult = ParseResult.Empty;
-            while (tokens.Count > 0) {
+            while (tokens.Count > 0)
+            {
                 parseResult = _Parse(tokens, instructions);
-                if(parseResult != ParseResult.OK) {
+                if (parseResult != ParseResult.OK)
+                {
                     return;
                 }
             }
@@ -36,9 +29,11 @@ namespace Unity.GoQL
             var tokens = tokenizer.Tokenize(code);
             var instructions = new List<object>();
             parseResult = ParseResult.Empty;
-            while (tokens.Count > 0) {
+            while (tokens.Count > 0)
+            {
                 parseResult = _Parse(tokens, instructions);
-                if(parseResult != ParseResult.OK) {
+                if (parseResult != ParseResult.OK)
+                {
                     return instructions;
                 }
             }
@@ -65,10 +60,10 @@ namespace Unity.GoQL
                     return ParseResult.OK;
                 case TokenType.OpenSquare:
                     // instructions.Add(GoQLCode.BeginIndexMatch);
-                    return _ParseDiscriminators(GoQLCode.FilterIndex, tokens, instructions, closeToken: TokenType.CloseSquare);
+                    return _ParseIndexes(tokens, instructions);
                 case TokenType.OpenAngle:
                     // instructions.Add(GoQLCode.BeginComponentMatch);
-                    return _ParseDiscriminators(GoQLCode.FilterComponent, tokens, instructions, closeToken: TokenType.CloseAngle);
+                    return _ParseDiscriminators(tokens, instructions);
                 case TokenType.Slash:
                     instructions.Add(GoQLCode.EnterChildren);
                     return ParseResult.OK;
@@ -76,7 +71,7 @@ namespace Unity.GoQL
             return ParseResult.OK;
         }
 
-        static ParseResult _ParseDiscriminators(GoQLCode discriminatorType, List<Token> tokens, List<object> instructions, TokenType closeToken)
+        static ParseResult _ParseDiscriminators(List<Token> tokens, List<object> instructions)
         {
             var elements = new List<object>();
             while (true)
@@ -84,25 +79,72 @@ namespace Unity.GoQL
                 if (tokens.Count == 0)
                 {
                     return ParseResult.UnexpectedEndOfInput;
-                    //throw new System.Exception("Syntax Error: unexpected EOF");
                 }
 
                 switch (tokens[0].type)
                 {
                     //end of discriminator
                     case TokenType.CloseAngle:
-                    case TokenType.CloseSquare:
-                        if (closeToken != tokens[0].type)
-                            return ParseResult.ClosingTokenMismatch;
                         tokens.RemoveAt(0);
                         if (elements.Count > 0)
                         {
                             instructions.AddRange(elements);
                             instructions.Add(elements.Count);
-                            instructions.Add(discriminatorType);
-                            // instructions.Add(GoQLCode.Discriminate);
+                            instructions.Add(GoQLCode.FilterByDiscriminators);
                         }
-                        // instructions.Add(GoQLCode.FinalizeDiscrimination);
+                        return ParseResult.OK;
+                    case TokenType.Comma:
+                        tokens.RemoveAt(0);
+                        break;
+                    case TokenType.Colon:
+                        //Make a discriminator object
+                        //if last element was a string, and next element is a string, create a discriminator.
+                        if (elements.Count > 0 && elements.Last() is string && tokens.Count > 1 && tokens[1].type == TokenType.String)
+                        {
+                            var lastElement = elements[elements.Count - 1];
+                            elements.RemoveAt(elements.Count - 1);
+                            elements.Add(new Discrimator() { type = (string)lastElement, value = (string)tokens[1].value });
+                            tokens.RemoveRange(0, 2);
+                        }
+                        else
+                        {
+                            return ParseResult.DiscriminatorSyntaxError;
+                        }
+                        break;
+                    case TokenType.String:
+                        //default discriminator is "type"
+                        elements.Add((string)tokens[0].value);
+                        tokens.RemoveAt(0);
+                        break;
+
+                    default:
+                        // ignore everything else, it is a syntax error.
+                        break;
+                }
+            }
+        }
+
+        static ParseResult _ParseIndexes(List<Token> tokens, List<object> instructions)
+        {
+            var elements = new List<object>();
+            while (true)
+            {
+                if (tokens.Count == 0)
+                {
+                    return ParseResult.UnexpectedEndOfInput;
+                }
+
+                switch (tokens[0].type)
+                {
+                    //end of discriminator
+                    case TokenType.CloseSquare:
+                        tokens.RemoveAt(0);
+                        if (elements.Count > 0)
+                        {
+                            instructions.AddRange(elements);
+                            instructions.Add(elements.Count);
+                            instructions.Add(GoQLCode.FilterIndex);
+                        }
                         return ParseResult.OK;
                     case TokenType.Comma:
                         tokens.RemoveAt(0);
@@ -136,10 +178,6 @@ namespace Unity.GoQL
                             end = -1;
                         }
                         elements.Add(new Range(start, end));
-                        break;
-                    case TokenType.String:
-                        elements.Add((string)tokens[0].value);
-                        tokens.RemoveAt(0);
                         break;
                     case TokenType.Number:
                         if (int.TryParse(tokens[0].value, out int n))

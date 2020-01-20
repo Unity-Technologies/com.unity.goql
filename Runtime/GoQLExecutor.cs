@@ -12,14 +12,16 @@ namespace Unity.GoQL
         readonly Stack<object> stack = new Stack<object>();
         readonly DoubleBuffer<GameObject> selection = new DoubleBuffer<GameObject>();
         readonly List<object> instructions = new List<object>();
-        
+
         bool refresh = true;
         string code;
-        
-        public string Code {
+
+        public string Code
+        {
             get => code;
-            set {
-                if(value != code) 
+            set
+            {
+                if (value != code)
                     refresh = true;
                 code = value;
             }
@@ -80,10 +82,11 @@ namespace Unity.GoQL
 
         public GameObject[] Execute()
         {
-            if(!refresh) {
+            if (!refresh)
+            {
                 return selection.ToArray();
             }
-            
+
             instructions.Clear();
             GoQL.Parser.Parse(code, instructions, out parseResult);
             stack.Clear();
@@ -123,8 +126,8 @@ namespace Unity.GoQL
                 case GoQLCode.EnterChildren:
                     EnterChildren();
                     break;
-                case GoQLCode.FilterComponent:
-                    FilterComponent();
+                case GoQLCode.FilterByDiscriminators:
+                    FilterByDiscriminators();
                     break;
                 case GoQLCode.FilterIndex:
                     FilterIndex();
@@ -209,7 +212,7 @@ namespace Unity.GoQL
                 for (var i = 0; i < selection.Count; i++)
                 {
                     indices[i] = selection[i].transform.GetSiblingIndex();
-                    lengths[i] = selection[i].transform.parent.childCount;
+                    lengths[i] = selection[i].transform.parent == null ? 1 : selection[i].transform.parent.childCount;
                 }
                 for (var i = 0; i < argCount; i++)
                 {
@@ -245,31 +248,72 @@ namespace Unity.GoQL
             }
         }
 
-        void FilterComponent()
+        void FilterByDiscriminators()
         {
             var argCount = (int)stack.Pop();
             for (var i = 0; i < argCount; i++)
             {
                 var arg = stack.Pop();
-                if (arg is string)
+                if (arg is Discrimator)
                 {
-                    var type = FindType((string)arg);
-                    if (type != null)
+                    var discriminator = (Discrimator)arg;
+                    PerformDiscrimination(discriminator);
+                }
+            }
+        }
+
+        private void PerformDiscrimination(Discrimator discriminator)
+        {
+            var discriminatorType = discriminator.type;
+            var value = discriminator.value;
+            switch (discriminatorType)
+            {
+                case "t":
+                    PerformTypeDiscrimination(value);
+                    break;
+                case "m":
+                    PerformMaterialDiscrimination(value);
+                    break;
+                default:
+                    Error = $"Unknown discrimator type: {discriminatorType}";
+                    break;
+            }
+        }
+
+        private void PerformMaterialDiscrimination(string value)
+        {
+            value = value.ToLower();
+            foreach (var g in selection)
+            {
+                if (g.TryGetComponent<Renderer>(out Renderer component))
+                {
+                    foreach (var m in component.sharedMaterials)
                     {
-                        foreach (var g in selection)
-                        {
-                            if (g.TryGetComponent(type, out Component component))
-                            {
-                                selection.Add(g);
-                            }
-                        }
-                        selection.Swap();
-                    }
-                    else
-                    {
-                        Error = $"Cannot load type {arg}";
+                        if (m != null && m.name.ToLower() == value)
+                            selection.Add(g);
                     }
                 }
+            }
+            selection.Swap();
+        }
+
+        private void PerformTypeDiscrimination(string value)
+        {
+            var type = FindType(value);
+            if (type != null)
+            {
+                foreach (var g in selection)
+                {
+                    if (g.TryGetComponent(type, out Component component))
+                    {
+                        selection.Add(g);
+                    }
+                }
+                selection.Swap();
+            }
+            else
+            {
+                Error = $"Cannot load type {value}";
             }
         }
 
