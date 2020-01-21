@@ -52,17 +52,14 @@ namespace Unity.GoQL
             tokens.RemoveAt(0);
             switch (token.type)
             {
-                //a string in this context is a name discrimator instruction
+                //a string in this context is a name discrimator.
                 case TokenType.String:
                     instructions.Add((string)(token.value));
                     instructions.Add(GoQLCode.FilterName);
-                    // instructions.Add(GoQLCode.Discriminate);
                     return ParseResult.OK;
                 case TokenType.OpenSquare:
-                    // instructions.Add(GoQLCode.BeginIndexMatch);
                     return _ParseIndexes(tokens, instructions);
                 case TokenType.OpenAngle:
-                    // instructions.Add(GoQLCode.BeginComponentMatch);
                     return _ParseDiscriminators(tokens, instructions);
                 case TokenType.Slash:
                     instructions.Add(GoQLCode.EnterChildren);

@@ -2,12 +2,11 @@
   "displayName": "GoQL",
   "name": "com.unity.goql",
   "unity": "2019.3",
-  "version": "0.0.0-preview",
-  "dependencies": {},
+  "version": "0.0.1-dev",
   "description": "Provides an api for quering and returning sets of gameobjects from the hierarchy.",
   "author": "Simon Wittber <simonwittber@unity3d.com> (https://github.com/smnwttbr)",
   "contributors": [
     "Simon Wittber <simonwittber@unity3d.com> (https://github.com/smnwttbr)"
-  ]        
-  
+  ],
+  "type": "library"
 }

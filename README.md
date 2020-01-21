@@ -24,12 +24,12 @@ Select all objects who have a name beginning with "Quad":
 
 Select second audio source component in children of all objects who have a name beginning with "Quad":
 
-    Quad*/<AudioSource>[1]
+    Quad*/<t:AudioSource>[1]
 
 
 Select all gameobjects that have a Transform and a AudioSource component: 
 
-    <Transform, AudioSource>
+    <t:Transform, t:AudioSource>
 
 
 Select the first 3 children of all objects that are a child of a renderer component and have "Audio" in their name: 
@@ -39,5 +39,9 @@ Select the first 3 children of all objects that are a child of a renderer compon
 
 From each object start has a name starting with "Quad" and who has a parent named "Cube", from all children that have an AudioSource component select the last one: 
 
-    Cube/Quad*/<AudioSource>[-1]
+    Cube/Quad*/<t:AudioSource>[-1]
+
+Select all gamobjects that use the material "Skin":
+
+    <m:Skin>
 
