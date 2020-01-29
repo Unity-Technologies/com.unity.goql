@@ -12,7 +12,7 @@ namespace Unity.GoQL
         List<object> instructions;
         GameObject[] selection;
 
-        [MenuItem("Window/General/GoQL")]
+        // [MenuItem("Window/General/GoQL")]
         static void OpenWindow()
         {
             var window = EditorWindow.GetWindow<GoQLWindow>();

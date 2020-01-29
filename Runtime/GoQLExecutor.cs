@@ -32,7 +32,7 @@ namespace Unity.GoQL
         public string Error
         {
             get;
-            private set;
+            set;
         } = string.Empty;
 
         static Dictionary<string, Type> typeCache;
@@ -262,7 +262,7 @@ namespace Unity.GoQL
             }
         }
 
-        private void PerformDiscrimination(Discrimator discriminator)
+        void PerformDiscrimination(Discrimator discriminator)
         {
             var discriminatorType = discriminator.type;
             var value = discriminator.value;
@@ -274,13 +274,16 @@ namespace Unity.GoQL
                 case "m":
                     PerformMaterialDiscrimination(value);
                     break;
+                case "s":
+                    PerformShaderDiscrimination(value);
+                    break;
                 default:
                     Error = $"Unknown discrimator type: {discriminatorType}";
                     break;
             }
         }
 
-        private void PerformMaterialDiscrimination(string value)
+        void PerformMaterialDiscrimination(string value)
         {
             value = value.ToLower();
             foreach (var g in selection)
@@ -297,7 +300,24 @@ namespace Unity.GoQL
             selection.Swap();
         }
 
-        private void PerformTypeDiscrimination(string value)
+        void PerformShaderDiscrimination(string value)
+        {
+            value = value.ToLower();
+            foreach (var g in selection)
+            {
+                if (g.TryGetComponent<Renderer>(out Renderer component))
+                {
+                    foreach (var m in component.sharedMaterials)
+                    {
+                        if (m != null && m.shader.name.ToLower() == value)
+                            selection.Add(g);
+                    }
+                }
+            }
+            selection.Swap();
+        }
+
+        void PerformTypeDiscrimination(string value)
         {
             var type = FindType(value);
             if (type != null)
