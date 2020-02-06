@@ -8,5 +8,8 @@
   "contributors": [
     "Simon Wittber <simonwittber@unity3d.com> (https://github.com/smnwttbr)"
   ],
-  "type": "library"
+  "type": "library",
+  "dependencies": {
+    "com.unity.quicksearch": "1.5.2-preview.1"
+  }
 }
