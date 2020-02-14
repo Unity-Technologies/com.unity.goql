@@ -1,4 +1,3 @@
-using JetBrains.Annotations;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,14 +10,13 @@ using UnityEngine;
 
 namespace Unity.GoQL
 {
-    [UsedImplicitly]
     public static class GoQLSearchProvider
     {
         const string k_ProviderId = "goql";
 
         static GoQLExecutor goqlMachine = goqlMachine = new GoQLExecutor();
 
-        [UsedImplicitly, SearchItemProvider]
+        [SearchItemProvider]
         internal static SearchProvider CreateProvider()
         {
             return new SearchProvider(k_ProviderId, "GoQL")
@@ -61,7 +59,7 @@ namespace Unity.GoQL
             };
         }
 
-        [UsedImplicitly, SearchActionsProvider]
+        [SearchActionsProvider]
         internal static IEnumerable<SearchAction> ActionHandlers()
         {
             return new [] { new SearchAction(k_ProviderId, "select") { handler = (item, context) => SelectObject(item) } };
