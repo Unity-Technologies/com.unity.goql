@@ -5,7 +5,7 @@ GoQL provides a syntax and API for specifying criteria, and then searching the G
 for the set of gameobjects that match those criterua.
     
     using Unity.GoQL;
-    var query = "*GameObject*"; //matches all gameobjects that have "GameObject" in their name.
+    var query = "\"*GameObject*\""; //matches all gameobjects that have "GameObject" in their name.
     var goqlMachine = new GoQLExecutor();
     var instructions = Parser.Parse(query);
     var selection = goqlMachine.Execute(instructions);
@@ -20,11 +20,11 @@ Select all root objects:
 
 Select all objects who have a name beginning with "Quad":
 
-    Quad*
+    "Quad*"
 
 Select second audio source component in children of all objects who have a name beginning with "Quad":
 
-    Quad*/<t:AudioSource>[1]
+    "Quad*"/<t:AudioSource>[1]
 
 
 Select all gameobjects that have a Transform and a AudioSource component: 
@@ -34,12 +34,12 @@ Select all gameobjects that have a Transform and a AudioSource component:
 
 Select the first 3 children of all objects that are a child of a renderer component and have "Audio" in their name: 
 
-    <Renderer>/*Audio*[0:3]
+    <Renderer>/"*Audio*"[0:3]
 
 
-From each object start has a name starting with "Quad" and who has a parent named "Cube", from all children that have an AudioSource component select the last one: 
+From each object named "Cube", select children that have a name starting with "Quad", then select the last grandchildren that has an AudioComponent.
 
-    Cube/Quad*/<t:AudioSource>[-1]
+    "Cube"/"Quad*"/<t:AudioSource>[-1]
 
 Select all gamobjects that use the material "Skin":
 
