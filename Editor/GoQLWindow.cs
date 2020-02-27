@@ -11,8 +11,9 @@ namespace Unity.GoQL
         GoQLExecutor goqlMachine = new GoQLExecutor();
         List<object> instructions;
         GameObject[] selection;
+        List<Token> tokens;
 
-        // [MenuItem("Window/General/GoQL")]
+        [MenuItem("Window/General/GoQL")]
         static void OpenWindow()
         {
             var window = EditorWindow.GetWindow<GoQLWindow>();
@@ -22,6 +23,7 @@ namespace Unity.GoQL
         // Update is called once per frame
         void Update()
         {
+            tokens = new Tokenizer().Tokenize(query);
             instructions = Parser.Parse(query, out ParseResult result);
             goqlMachine.Code = query;
             selection = goqlMachine.Execute();
@@ -35,6 +37,11 @@ namespace Unity.GoQL
             if (goqlMachine.Error != string.Empty)
             {
                 EditorGUILayout.HelpBox(goqlMachine.Error, MessageType.Error);
+            }
+            if(tokens != null) {
+                foreach(var t in tokens) {
+                    GUILayout.Label(t.ToString());
+                }
             }
             if (instructions != null)
                 foreach (var i in instructions)
