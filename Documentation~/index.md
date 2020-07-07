@@ -103,7 +103,7 @@ Select all gameobjects that have a Transform and a AudioSource component:
 
 Select the first 3 children of all objects that are a child of a renderer component and have "Audio" in their name: 
 
-    <Renderer>/*Audio*[0:3]
+    <t:Renderer>/*Audio*[0:3]
 
 
 From each object named "Cube", select children that have a name starting with "Quad", then select the last grandchild that has an AudioComponent.
