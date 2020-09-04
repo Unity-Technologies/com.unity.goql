@@ -62,7 +62,6 @@ namespace Unity.GoQL
         [SearchActionsProvider]
         internal static IEnumerable<SearchAction> ActionHandlers()
         {
-            //return new [] { new SearchAction(k_ProviderId, "select") { handler = (item, context) => SelectObject(item) } };
             return new [] { new SearchAction(k_ProviderId, "select") { handler = (item) => SelectObject(item) } };
         }
 
@@ -86,12 +85,7 @@ namespace Unity.GoQL
             yield return goqlMachine.Execute().Select(go =>
             {
                 SearchItem item = provider.CreateItem(go.GetInstanceID().ToString());
-
-                //item.descriptionFormat = SearchItemDescriptionFormat.Ellipsis | 
-                //    SearchItemDescriptionFormat.RightToLeft | 
-                //    SearchItemDescriptionFormat.Highlight;
                 item.options = SearchItemOptions.Ellipsis | SearchItemOptions.RightToLeft | SearchItemOptions.Highlight;
-
                 return item;
             });
         }
